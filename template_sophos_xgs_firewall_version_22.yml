@@ -1,0 +1,938 @@
+zabbix_export:
+  version: "7.0"
+  templates:
+    - uuid: f47ac10b58cc4372a5670e02b2c3d479
+      template: Sophos XGS Firewall SNMP
+      name: Sophos XGS Firewall SNMP
+      description: |
+        Template for Sophos XG/SFOS Firewall via SNMP
+        Based on SFOS-FIREWALL-MIB (Sophos PLC)
+        Supports: Device Info, Stats, HA, Licenses, IPSec VPN LLD, Interface LLD
+      groups:
+        - name: Templates/Network devices
+
+      items:
+        # ─── Device Info ───────────────────────────────────────────────
+        - uuid: 3d6f4aa08e764b3e9c1a2b5f8e0d7c91
+          name: Device Name
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.1.1.0
+          key: sfosDeviceName
+          delay: 1h
+          history: 7d
+          trends: "0"
+          value_type: CHAR
+          description: Hostname of the SFOS XG Device
+          tags:
+            - tag: component
+              value: device-info
+
+        - uuid: 7b2e9f1c4a8d4e6baf5c2a9d1e4b7f03
+          name: Device Type
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.1.2.0
+          key: sfosDeviceType
+          delay: 1h
+          history: 7d
+          trends: "0"
+          value_type: CHAR
+          description: "Type of Device (e.g. XG-85, XG-210)"
+          tags:
+            - tag: component
+              value: device-info
+
+        - uuid: c9a4e2f7b1d6483e9f3a8c0b2d9e1f47
+          name: Firmware Version
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.1.3.0
+          key: sfosDeviceFWVersion
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Current running firmware version of SFOS
+          tags:
+            - tag: component
+              value: device-info
+
+        # ─── Device Stats ──────────────────────────────────────────────
+        - uuid: 2a7f3c9e5b1d408688e2a0c4b6d9f3e1
+          name: System Uptime
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.2.2.0
+          key: sfosUpTime
+          delay: 5m
+          history: 30d
+          trends: 365d
+          value_type: FLOAT
+          units: uptime
+          description: SFOS system uptime (TimeTicks converted to seconds)
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - "0.01"
+          tags:
+            - tag: component
+              value: system
+          triggers:
+            - uuid: 8e1b4f7a2c9d4036b0f3e8a1c4d7b2f9
+              expression: "last(/Sophos XGS Firewall SNMP/sfosUpTime)<600"
+              name: "Sophos XGS: Device has been restarted (uptime < 10m)"
+              priority: WARNING
+              description: Device uptime is less than 10 minutes — possible reboot.
+              manual_close: "YES"
+
+        - uuid: 5c8e2a1f9b4d403690f5c3a8b1d4e7f2
+          name: Disk Capacity
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.2.4.1.0
+          key: sfosDiskCapacity
+          delay: 5m
+          history: 30d
+          trends: 365d
+          value_type: FLOAT
+          units: "!MB"
+          description: Total disk capacity in MB
+          tags:
+            - tag: component
+              value: storage
+
+        - uuid: 9d3b6f0e2a5c4147a1e4b7d0a3c6f9e2
+          name: Disk Usage (%)
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.2.4.2.0
+          key: sfosDiskPercentUsage
+          delay: 5m
+          history: 30d
+          trends: 365d
+          value_type: FLOAT
+          units: "%"
+          description: Percentage of disk usage
+          tags:
+            - tag: component
+              value: storage
+          triggers:
+            - uuid: 4f7a1c3e8b2d406990f4a7c1b3d6f8e0
+              expression: "last(/Sophos XGS Firewall SNMP/sfosDiskPercentUsage)>=90"
+              name: "Sophos XGS: Disk usage is critically high (>=90%)"
+              priority: HIGH
+              description: Disk usage has exceeded 90%.
+            - uuid: b2d5f8a1c4e7439bbf0d3a5c8e1b4f7a
+              expression: "last(/Sophos XGS Firewall SNMP/sfosDiskPercentUsage)>=75 and last(/Sophos XGS Firewall SNMP/sfosDiskPercentUsage)<90"
+              name: "Sophos XGS: Disk usage is high (>=75%)"
+              priority: WARNING
+              description: Disk usage has exceeded 75%.
+
+        - uuid: e6c9a2f5b8d1447e8f6c9a2b5d8e1f4a
+          name: Memory Capacity
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.2.5.1.0
+          key: sfosMemoryCapacity
+          delay: 5m
+          history: 30d
+          trends: 365d
+          value_type: FLOAT
+          units: "!MB"
+          description: Total memory capacity in MB
+          tags:
+            - tag: component
+              value: memory
+
+        - uuid: 1f4a7d0b3e6c425882e5b8a1d4c7f0e3
+          name: Memory Usage (%)
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.2.5.2.0
+          key: sfosMemoryPercentUsage
+          delay: 5m
+          history: 30d
+          trends: 365d
+          value_type: FLOAT
+          units: "%"
+          description: Percentage of main memory usage
+          tags:
+            - tag: component
+              value: memory
+          triggers:
+            - uuid: 6b9e2c5f8a1d4037b0f6b9e2a5d8c1f4
+              expression: "last(/Sophos XGS Firewall SNMP/sfosMemoryPercentUsage)>=90"
+              name: "Sophos XGS: Memory usage is critically high (>=90%)"
+              priority: HIGH
+              description: Memory usage has exceeded 90%.
+            - uuid: 3a6d9f2b5e8c4047a0f3a6b9c2e5f8d1
+              expression: "last(/Sophos XGS Firewall SNMP/sfosMemoryPercentUsage)>=80 and last(/Sophos XGS Firewall SNMP/sfosMemoryPercentUsage)<90"
+              name: "Sophos XGS: Memory usage is high (>=80%)"
+              priority: WARNING
+              description: Memory usage has exceeded 80%.
+
+        # ─── HA Status ─────────────────────────────────────────────────
+        - uuid: 8c1e4b7f0a3d4259a5f8c1b4d7a0e3f6
+          name: HA Status
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.4.1.0
+          key: sfosHAStatus
+          delay: 5m
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: "HA Status: 0=disabled, 1=enabled"
+          valuemap:
+            name: "Sophos HA Status"
+          tags:
+            - tag: component
+              value: ha
+          triggers:
+            - uuid: 5f8b2e1c4a7d4369b3f6c9e2a5d8b1f4
+              expression: "last(/Sophos XGS Firewall SNMP/sfosHAStatus)=0"
+              name: "Sophos XGS: HA is disabled"
+              priority: WARNING
+              description: High Availability is currently disabled.
+
+        - uuid: d0f3a6c9b2e5414f8c0d3a6e9b2f5c8a
+          name: HA Current Device State
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.4.4.0
+          key: sfosDeviceCurrentHAState
+          delay: 5m
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: |
+            HA State: 0=notapplicable, 1=auxiliary, 2=standAlone, 3=primary, 4=faulty, 5=ready
+          valuemap:
+            name: "Sophos HA State"
+          tags:
+            - tag: component
+              value: ha
+          triggers:
+            - uuid: 2e5a8d1f4b7c4369b6f2a5b8d1c4f7a0
+              expression: "last(/Sophos XGS Firewall SNMP/sfosDeviceCurrentHAState)=4"
+              name: "Sophos XGS: HA device state is FAULTY"
+              priority: HIGH
+              description: Current HA device state is faulty.
+            - uuid: 7a0d3f6c9b2e414884a7d0c3b6e9f2a5
+              expression: "last(/Sophos XGS Firewall SNMP/sfosDeviceCurrentHAState)=1"
+              name: "Sophos XGS: HA device is in AUXILIARY state"
+              priority: INFO
+              description: Current device is operating as HA auxiliary.
+
+        # ─── License Items ─────────────────────────────────────────────
+        - uuid: 4b7e0a3d6f9c415885b8a1d4f7c0e3b6
+          name: "License: Network Protection - Status"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.2.1.0
+          key: sfosNetProtectionLicRegStatus
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: "Network Protection license status"
+          valuemap:
+            name: "Sophos Subscription Status"
+          tags:
+            - tag: component
+              value: license
+
+        - uuid: 9e2c5f8b1d4a403690e3f6a9b2d5c8f1
+          name: "License: Network Protection - Expiry"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.2.2.0
+          key: sfosNetProtectionLicExpiryDate
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Network Protection license expiry date
+          tags:
+            - tag: component
+              value: license
+          triggers:
+            - uuid: 6a9d2f5c8e1b403780a3d6c9b2e5f8a1
+              expression: "last(/Sophos XGS Firewall SNMP/sfosNetProtectionLicRegStatus)=4"
+              name: "Sophos XGS: Network Protection license has EXPIRED"
+              priority: HIGH
+              description: Network Protection subscription has expired.
+            - uuid: 1d4f7a0c3e6b4258a5f8a1c4e7b0d3f6
+              expression: "last(/Sophos XGS Firewall SNMP/sfosNetProtectionLicRegStatus)=2"
+              name: "Sophos XGS: Network Protection is NOT subscribed"
+              priority: WARNING
+              description: Network Protection is not subscribed.
+
+        - uuid: 8f1b4e7a0d3c4259b5e8f1a4d7c0b3e6
+          name: "License: Web Protection - Status"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.3.1.0
+          key: sfosWebProtectionLicRegStatus
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: Web Protection license status
+          valuemap:
+            name: "Sophos Subscription Status"
+          tags:
+            - tag: component
+              value: license
+
+        - uuid: 3c6e9b2f5a8d404784c7f0b3d6a9c2f5
+          name: "License: Web Protection - Expiry"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.3.2.0
+          key: sfosWebProtectionLicExpiryDate
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Web Protection license expiry date
+          tags:
+            - tag: component
+              value: license
+          triggers:
+            - uuid: a5d8f1b4e7c0469a9f5b8d1c4e7a0f3b
+              expression: "last(/Sophos XGS Firewall SNMP/sfosWebProtectionLicRegStatus)=4"
+              name: "Sophos XGS: Web Protection license has EXPIRED"
+              priority: HIGH
+            - uuid: 0e3b6f9c2a5d414793e6b9c2a5d8f1e4
+              expression: "last(/Sophos XGS Firewall SNMP/sfosWebProtectionLicRegStatus)=2"
+              name: "Sophos XGS: Web Protection is NOT subscribed"
+              priority: WARNING
+
+        - uuid: 7d0a3e6f9b2c414881d4a7f0b3c6e9d2
+          name: "License: Mail Protection - Status"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.4.1.0
+          key: sfosMailProtectionLicRegStatus
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: Mail Protection license status
+          valuemap:
+            name: "Sophos Subscription Status"
+          tags:
+            - tag: component
+              value: license
+
+        - uuid: 2b5e8c1f4a7d4369a6f9b2e5a8d1c4f7
+          name: "License: Mail Protection - Expiry"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.4.2.0
+          key: sfosMailProtectionLicExpiryDate
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Mail Protection license expiry date
+          tags:
+            - tag: component
+              value: license
+          triggers:
+            - uuid: f4a7d0b3e6c9458fbe4a7d0b3e6c9f2a
+              expression: "last(/Sophos XGS Firewall SNMP/sfosMailProtectionLicRegStatus)=4"
+              name: "Sophos XGS: Mail Protection license has EXPIRED"
+              priority: HIGH
+            - uuid: 9c2f5b8e1a4d4036b0f3c6e9a2d5b8f1
+              expression: "last(/Sophos XGS Firewall SNMP/sfosMailProtectionLicRegStatus)=2"
+              name: "Sophos XGS: Mail Protection is NOT subscribed"
+              priority: WARNING
+
+        - uuid: 4e7b0d3f6c9a4158a7e0b3f6c9a2d5e8
+          name: "License: Web Server Protection - Status"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.5.1.0
+          key: sfosWebServerProtectionLicRegStatus
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: Web Server Protection license status
+          valuemap:
+            name: "Sophos Subscription Status"
+          tags:
+            - tag: component
+              value: license
+
+        - uuid: b3d6f9a2c5e8447b8d3f6a9c2e5b8d1f
+          name: "License: Web Server Protection - Expiry"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.5.2.0
+          key: sfosWebServerProtectionLicExpiryDate
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Web Server Protection license expiry date
+          tags:
+            - tag: component
+              value: license
+          triggers:
+            - uuid: 6f9c2e5b8a1d4037b9f2c5b8a1d4e7c0
+              expression: "last(/Sophos XGS Firewall SNMP/sfosWebServerProtectionLicRegStatus)=4"
+              name: "Sophos XGS: Web Server Protection license has EXPIRED"
+              priority: HIGH
+            - uuid: 1a4d7f0b3e6c4258a4d7f0b3e6c9a2d5
+              expression: "last(/Sophos XGS Firewall SNMP/sfosWebServerProtectionLicRegStatus)=2"
+              name: "Sophos XGS: Web Server Protection is NOT subscribed"
+              priority: WARNING
+
+        - uuid: 8a1d4e7b0f3c4259a1d4e7b0f3c6a9d2
+          name: "License: Sandstorm - Status"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.6.1.0
+          key: sfosSandstromLicRegStatus
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: Sandstorm license status
+          valuemap:
+            name: "Sophos Subscription Status"
+          tags:
+            - tag: component
+              value: license
+
+        - uuid: 5c8f1b4e7a0d426995f8b1e4a7d0c3f6
+          name: "License: Sandstorm - Expiry"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.6.2.0
+          key: sfosSandstromLicExpiryDate
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Sandstorm license expiry date
+          tags:
+            - tag: component
+              value: license
+          triggers:
+            - uuid: 2e5b8d1f4a7c4369a2b5d8f1a4c7e0b3
+              expression: "last(/Sophos XGS Firewall SNMP/sfosSandstromLicRegStatus)=4"
+              name: "Sophos XGS: Sandstorm license has EXPIRED"
+              priority: HIGH
+            - uuid: 7f0c3e6b9a2d414897c0e3b6a9d2f5c8
+              expression: "last(/Sophos XGS Firewall SNMP/sfosSandstromLicRegStatus)=2"
+              name: "Sophos XGS: Sandstorm is NOT subscribed"
+              priority: WARNING
+
+        - uuid: c4a7f0d3b6e9458c9a7f0d3b6e9c2a5f
+          name: "License: Enhanced Support - Status"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.7.1.0
+          key: sfosEnhancedSupportLicRegStatus
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: Enhanced Support license status
+          valuemap:
+            name: "Sophos Subscription Status"
+          tags:
+            - tag: component
+              value: license
+
+        - uuid: 0d3a6e9f2b5c4147a0a3e6f9b2c5d8a1
+          name: "License: Enhanced Support - Expiry"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.7.2.0
+          key: sfosEnhancedSupportLicExpiryDate
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Enhanced Support license expiry date
+          tags:
+            - tag: component
+              value: license
+          triggers:
+            - uuid: 9b2e5f8c1a4d4036b9e2f5c8a1d4b7f0
+              expression: "last(/Sophos XGS Firewall SNMP/sfosEnhancedSupportLicRegStatus)=4"
+              name: "Sophos XGS: Enhanced Support license has EXPIRED"
+              priority: HIGH
+            - uuid: 4f7a0c3d6b9e415884a7c0d3b6e9f2a5
+              expression: "last(/Sophos XGS Firewall SNMP/sfosEnhancedSupportLicRegStatus)=2"
+              name: "Sophos XGS: Enhanced Support is NOT subscribed"
+              priority: WARNING
+
+        - uuid: e1b4d7f0a3c6459eab4d7f0a3c6e9b2d
+          name: "License: Enhanced Plus Support - Status"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.8.1.0
+          key: sfosEnhancedPlusLicRegStatus
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: Enhanced Plus Support license status
+          valuemap:
+            name: "Sophos Subscription Status"
+          tags:
+            - tag: component
+              value: license
+
+        - uuid: 6c9f2a5e8b1d4037a6f9a2e5b8d1c4f7
+          name: "License: Enhanced Plus Support - Expiry"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.8.2.0
+          key: sfosEnhancedPlusLicExpiryDate
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Enhanced Plus Support license expiry date
+          tags:
+            - tag: component
+              value: license
+          triggers:
+            - uuid: 3a6d9c2f5e8b4047a3d6c9f2e5b8a1d4
+              expression: "last(/Sophos XGS Firewall SNMP/sfosEnhancedPlusLicRegStatus)=4"
+              name: "Sophos XGS: Enhanced Plus Support license has EXPIRED"
+              priority: HIGH
+            - uuid: 8e1f4b7a0d3c4259b8f1b4a7d0c3e6b9
+              expression: "last(/Sophos XGS Firewall SNMP/sfosEnhancedPlusLicRegStatus)=2"
+              name: "Sophos XGS: Enhanced Plus Support is NOT subscribed"
+              priority: WARNING
+
+        - uuid: b5d8a1e4f7c0469b9d8a1e4f7c0b3d6f
+          name: "License: Central Orchestration - Status"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.9.1.0
+          key: sfosCentralOrchestrationLicRegStatus
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: UNSIGNED
+          description: Central Orchestration license status
+          valuemap:
+            name: "Sophos Subscription Status"
+          tags:
+            - tag: component
+              value: license
+
+        - uuid: 0f3c6a9d2e5b4147a0c3a6d9e2b5f8c1
+          name: "License: Central Orchestration - Expiry"
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.2604.5.1.5.9.2.0
+          key: sfosCentralOrchestrationLicExpiryDate
+          delay: 1h
+          history: 30d
+          trends: "0"
+          value_type: CHAR
+          description: Central Orchestration license expiry date
+          tags:
+            - tag: component
+              value: license
+          triggers:
+            - uuid: 5a8e1b4f7c0d4269a5e8b1f4c7d0a3e6
+              expression: "last(/Sophos XGS Firewall SNMP/sfosCentralOrchestrationLicRegStatus)=4"
+              name: "Sophos XGS: Central Orchestration license has EXPIRED"
+              priority: HIGH
+            - uuid: d2f5c8a1e4b7436d8f5c8a1e4b7d0f3a
+              expression: "last(/Sophos XGS Firewall SNMP/sfosCentralOrchestrationLicRegStatus)=2"
+              name: "Sophos XGS: Central Orchestration is NOT subscribed"
+              priority: WARNING
+
+      # ─── LLD Rules ───────────────────────────────────────────────────
+      discovery_rules:
+
+        # ── IPSec VPN Tunnel Discovery ──────────────────────────────────
+        - uuid: 7c0e3f6b9a2d4148a7e0f3b6a9d2c5e8
+          name: IPSec VPN Tunnel Discovery
+          type: SNMP_AGENT
+          snmp_oid: "discovery[{#VPN_NAME},1.3.6.1.4.1.2604.5.1.6.1.1.1.1.2]"
+          key: ipsec.tunnel.discovery
+          delay: 1h
+          lifetime: 30d
+          description: Discovers all IPSec VPN tunnels from sfosIPSecVpnTunnelTable
+          item_prototypes:
+            - uuid: 9e2a5d8f1b4c403689a2d5f8b1c4e7a0
+              name: "VPN [{#VPN_NAME}]: Connection Status"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.9.{#SNMPINDEX}"
+              key: "sophos.ipsec.conn.status[{#VPN_NAME}]"
+              delay: 1m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              description: "Connection status: 0=Inactive, 1=Active, 2=Partially Active"
+              valuemap:
+                name: "Sophos IPSec VPN Connection Status"
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+              trigger_prototypes:
+                - uuid: 4f7b0d3e6c9a415884b7d0e3c6a9f2b5
+                  expression: >-
+                    last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}])=0
+                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}],#2)=1
+                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.activation.status[{#VPN_NAME}])=1
+                  name: "ALERT: VPN connection [{#VPN_NAME}] is DOWN"
+                  priority: DISASTER
+                  description: "IPSec VPN tunnel {#VPN_NAME} was active but is now inactive."
+                  tags:
+                    - tag: VPN Tunnel
+                      value: "{#VPN_NAME}"
+                - uuid: a1c4e7f0b3d6459a8c4e7f0b3d6a9c2e
+                  expression: >-
+                    last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}])=2
+                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.activation.status[{#VPN_NAME}])=1
+                  name: "ALERT: VPN connection [{#VPN_NAME}] is DEGRADED"
+                  priority: HIGH
+                  description: "IPSec VPN tunnel {#VPN_NAME} is only partially active."
+                  tags:
+                    - tag: VPN Tunnel
+                      value: "{#VPN_NAME}"
+
+            - uuid: 6d9f2b5e8c1a4037b6f9b2e5c8a1d4f7
+              name: "VPN [{#VPN_NAME}]: Activation Status"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.10.{#SNMPINDEX}"
+              key: "sophos.ipsec.activation.status[{#VPN_NAME}]"
+              delay: 1m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              description: "Activation status: 0=Inactive, 1=Active"
+              valuemap:
+                name: "Sophos IPSec VPN Activation Status"
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+
+            - uuid: b8e1f4a7d0c3469b8e1f4a7d0c3b6e9f
+              name: "VPN [{#VPN_NAME}]: Active Tunnel Count"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.8.{#SNMPINDEX}"
+              key: "sophos.ipsec.active.tunnel[{#VPN_NAME}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              description: Count of active sub-tunnels for this connection
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+
+            - uuid: 5c8b1e4f7a0d4269b5b8e1f4a7d0c3f6
+              name: "VPN [{#VPN_NAME}]: Connection Type"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.6.{#SNMPINDEX}"
+              key: "sophos.ipsec.conn.type[{#VPN_NAME}]"
+              delay: 1h
+              history: 30d
+              trends: "0"
+              value_type: UNSIGNED
+              description: "Connection type: 1=host-to-host, 2=site-to-site, 3=tunnel-interface"
+              valuemap:
+                name: "Sophos IPSec VPN Connection Type"
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+
+            - uuid: 0a3d6f9c2b5e4147a0d3f6c9b2e5a8d1
+              name: "VPN [{#VPN_NAME}]: Local Gateway Port"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.7.{#SNMPINDEX}"
+              key: "sophos.ipsec.local.gw.port[{#VPN_NAME}]"
+              delay: 1h
+              history: 30d
+              trends: "0"
+              value_type: CHAR
+              description: Port used as local gateway for this IPSec tunnel
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+
+
+
+        # ── Network Interface Discovery (IF-MIB) ────────────────────────
+        - uuid: f5a8c1e4b7d0469faa8c1e4b7d0f3a6c
+          name: Network Interface Discovery
+          type: SNMP_AGENT
+          snmp_oid: "discovery[{#IFINDEX},1.3.6.1.2.1.2.2.1.1,{#IFNAME},1.3.6.1.2.1.31.1.1.1.1,{#IFDESCR},1.3.6.1.2.1.2.2.1.2,{#IFTYPE},1.3.6.1.2.1.2.2.1.3,{#IFADMINSTATUS},1.3.6.1.2.1.2.2.1.7]"
+          key: net.if.discovery
+          delay: 5m
+          lifetime: 30d
+          description: Discovers network interfaces via standard IF-MIB
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: "{#IFNAME}"
+                value: '^(Port[0-9]+|Port[0-9]+\.[0-9]+|PortF[0-9]+|PortMGMT)$'
+                operator: MATCHES_REGEX
+                formulaid: A
+              - macro: "{#IFADMINSTATUS}"
+                value: "^1$"
+                operator: MATCHES_REGEX
+                formulaid: B
+          item_prototypes:
+            - uuid: 2d5f8b1e4a7c4369b2f5b8e1a4c7d0f3
+              name: "Interface [{#IFNAME}]: Operational Status"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}"
+              key: "net.if.status[{#SNMPINDEX}]"
+              delay: 1m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              description: "ifOperStatus: 1=up, 2=down"
+              valuemap:
+                name: "IF-MIB::ifOperStatus"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+              trigger_prototypes:
+                - uuid: 9f2c5e8b1d4a403689c2e5b8d1a4f7c0
+                  expression: "last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}])<>1 and last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}])<>last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}],#2)"
+                  name: "Sophos XG Interface [{#IFNAME}]: Link is DOWN"
+                  priority: HIGH
+                  description: Interface {#IFNAME} operational status changed to down.
+                  manual_close: "YES"
+
+            - uuid: 6a9e2c5f8b1d4037a6e9c2f5b8d1a4f7
+              name: "Interface [{#IFNAME}]: Inbound Traffic (bps)"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}"
+              key: "net.if.in[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: bps
+              description: ifHCInOctets converted to bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ""
+                - type: MULTIPLIER
+                  parameters:
+                    - "8"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+
+            - uuid: 1e4b7d0f3c6a425881b4d7f0a3c6e9b2
+              name: "Interface [{#IFNAME}]: Outbound Traffic (bps)"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}"
+              key: "net.if.out[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: bps
+              description: ifHCOutOctets converted to bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ""
+                - type: MULTIPLIER
+                  parameters:
+                    - "8"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+
+            - uuid: 8c1f4b7e0a3d4259a8f1b4e7a0d3c6f9
+              name: "Interface [{#IFNAME}]: Inbound Errors (eps)"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}"
+              key: "net.if.in.errors[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: eps
+              description: ifInErrors per second
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ""
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+              trigger_prototypes:
+                - uuid: 3d6a9f2c5e8b4047a3a6f9c2e5b8d1a4
+                  expression: "avg(/Sophos XGS Firewall SNMP/net.if.in.errors[{#SNMPINDEX}],5m)>10"
+                  name: "Sophos XG Interface [{#IFNAME}]: High inbound error rate (>10 eps)"
+                  priority: WARNING
+
+            - uuid: f0a3d6c9b2e5414f8a3d6c9b2e5f8a1d
+              name: "Interface [{#IFNAME}]: Outbound Errors (eps)"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}"
+              key: "net.if.out.errors[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: eps
+              description: ifOutErrors per second
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ""
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+              trigger_prototypes:
+                - uuid: 5b8e1c4f7a0d4269b5e8c1f4a7d0b3e6
+                  expression: "avg(/Sophos XGS Firewall SNMP/net.if.out.errors[{#SNMPINDEX}],5m)>10"
+                  name: "Sophos XG Interface [{#IFNAME}]: High outbound error rate (>10 eps)"
+                  priority: WARNING
+
+            - uuid: a2d5f8b1e4c7436a9d5f8b1e4c7a0d3f
+              name: "Interface [{#IFNAME}]: Speed"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}"
+              key: "net.if.speed[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: bps
+              description: ifHighSpeed in Mbps multiplied to bps
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - "1000000"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+
+            - uuid: 7f0c3b6e9a2d414887c0b3e6a9d2f5c8
+              name: "Interface [{#IFNAME}]: Admin Status"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}"
+              key: "net.if.admin.status[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: "0"
+              value_type: UNSIGNED
+              description: "ifAdminStatus: 1=up, 2=down, 3=testing"
+              valuemap:
+                name: "IF-MIB::ifAdminStatus"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+
+
+      # ─── Value Maps ───────────────────────────────────────────────────
+      valuemaps:
+        - uuid: c3e6f9b2a5d8447c9e6f9b2a5d8c1e4f
+          name: "Sophos HA Status"
+          mappings:
+            - value: "0"
+              newvalue: disabled
+            - value: "1"
+              newvalue: enabled
+
+        - uuid: 8a1d4f7c0b3e4259a1d4f7c0b3e6a9d2
+          name: "Sophos HA State"
+          mappings:
+            - value: "0"
+              newvalue: notapplicable
+            - value: "1"
+              newvalue: auxiliary
+            - value: "2"
+              newvalue: standAlone
+            - value: "3"
+              newvalue: primary
+            - value: "4"
+              newvalue: faulty
+            - value: "5"
+              newvalue: ready
+
+        - uuid: 5e8b1c4f7a0d426995b8c1f4a7d0e3b6
+          name: "Sophos Subscription Status"
+          mappings:
+            - value: "0"
+              newvalue: none
+            - value: "1"
+              newvalue: evaluating
+            - value: "2"
+              newvalue: notsubscribed
+            - value: "3"
+              newvalue: subscribed
+            - value: "4"
+              newvalue: expired
+            - value: "5"
+              newvalue: deactivated
+
+        - uuid: 2f5c8e1b4a7d4369a2c5e8b1a4d7f0c3
+          name: "Sophos IPSec VPN Connection Status"
+          mappings:
+            - value: "0"
+              newvalue: inactive
+            - value: "1"
+              newvalue: active
+            - value: "2"
+              newvalue: partially-active
+
+        - uuid: 9d2f5a8c1e4b4036a2f5a8c1e4b7d0f3
+          name: "Sophos IPSec VPN Activation Status"
+          mappings:
+            - value: "0"
+              newvalue: inactive
+            - value: "1"
+              newvalue: active
+
+        - uuid: 6b9e2d5f8a1c4037b6e9d2f5a8c1b4e7
+          name: "Sophos IPSec VPN Connection Type"
+          mappings:
+            - value: "1"
+              newvalue: host-to-host
+            - value: "2"
+              newvalue: site-to-site
+            - value: "3"
+              newvalue: tunnel-interface
+
+        - uuid: 3c6f9a2e5b8d4047a3f6a9e2b5d8c1f4
+          name: "IF-MIB::ifOperStatus"
+          mappings:
+            - value: "1"
+              newvalue: up
+            - value: "2"
+              newvalue: down
+            - value: "3"
+              newvalue: testing
+            - value: "4"
+              newvalue: unknown
+            - value: "5"
+              newvalue: dormant
+            - value: "6"
+              newvalue: notPresent
+            - value: "7"
+              newvalue: lowerLayerDown
+
+        - uuid: a0d3f6c9b2e5414aad3f6c9b2e5a8d1f
+          name: "IF-MIB::ifAdminStatus"
+          mappings:
+            - value: "1"
+              newvalue: up
+            - value: "2"
+              newvalue: down
+            - value: "3"
+              newvalue: testing

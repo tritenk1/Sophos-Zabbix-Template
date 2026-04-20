@@ -5,6 +5,7 @@ zabbix_export:
       template: Sophos XGS Firewall SNMP
       name: Sophos XGS Firewall SNMP
       description: |
+        Author: Tri Nguyen - Vacif Company Limited
         Template for Sophos XG/SFOS Firewall via SNMP
         Based on SFOS-FIREWALL-MIB (Sophos PLC)
         Supports: Device Info, Stats, HA, Licenses, IPSec VPN LLD, Interface LLD

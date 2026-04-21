@@ -19,3 +19,17 @@ Template này sử dụng SNMP để thu thập dữ liệu và cung cấp các 
 - Trạng thái IPsec VPN
 
 - License thiết bị
+
+**⚙️ Hướng dẫn cài đặt**
+
+***1. Import Template:***
+
+- Tải file template_sophos_xgs_firewall_version_22.yml.
+
+- Trong Zabbix Web UI, đi tới Data collection > Templates > Import.
+
+***2. Gắn Template vào Host:***
+
+- Tạo hoặc chọn Host đại diện cho thiết bị Sophos Firewall.
+
+- Trong phần Templates, thêm template Sophos XGS Firewall SNMP.

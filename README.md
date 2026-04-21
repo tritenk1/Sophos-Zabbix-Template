@@ -1,7 +1,8 @@
 
 **Sophos Firewall Zabbix Template**
 
-Bộ template Sophos Firewall SFOS v22, được thiết kế cho Zabbix 7.0 LTS trở lên.
+Bộ template Sophos Firewall SFOS v22 cho Zabbix 7.0 LTS trở lên.
+
 
 **🚀 Tính năng chính**
 

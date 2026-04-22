@@ -29,7 +29,7 @@ zabbix_export:
               parameters:
                 - '{#SNMPINDEX}'                  # params/0: field name
                 - '1.3.6.1.2.1.25.3.3.1.2'       # params/1: OID prefix
-                - '0'                             # params/2: format = Unchanged ✅
+                - '0'                             # params/2: format 
 
           item_prototypes:
             - uuid: c1a9e4d72b6f4c8391de5f7a8b9c0d12
@@ -46,8 +46,8 @@ zabbix_export:
               preprocessing:
                 - type: SNMP_WALK_VALUE
                   parameters:
-                    - '1.3.6.1.2.1.25.3.3.1.2.{#SNMPINDEX}'  # ✅
-                    - '0'                                      # format = Unchanged
+                    - '1.3.6.1.2.1.25.3.3.1.2.{#SNMPINDEX}'  
+                    - '0'                                      
                   
       # ── IPSec VPN Tunnel Discovery ──────────────────────────────────
         - uuid: 7c0e3f6b9a2d4148a7e0f3b6a9d2c5e8
@@ -410,7 +410,7 @@ zabbix_export:
           trends: '0'
           value_type: TEXT
 
-        # ===== Calculated Item tính trung bình =====
+        # ===== Calculated CPU =====
         - uuid: 4d7f2a9c8b314e65a0d46c9e1f2b7a53
           name: CPU Average
           type: CALCULATED

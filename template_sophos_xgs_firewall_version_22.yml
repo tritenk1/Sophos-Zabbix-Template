@@ -5,7 +5,6 @@ zabbix_export:
       template: Sophos XGS Firewall SNMP
       name: Sophos XGS Firewall SNMP
       description: |
-        Author: Tri Nguyen - Vacif Company Limited
         Template for Sophos XG/SFOS Firewall via SNMP
         Based on SFOS-FIREWALL-MIB (Sophos PLC)
         Supports: Device Info, Stats, HA, Licenses, IPSec VPN LLD, Interface LLD
@@ -57,6 +56,46 @@ zabbix_export:
               value: device-info
 
         # ─── Device Stats ──────────────────────────────────────────────
+        - uuid: 8f3d7b2e6c414a0a9e6b1c2d4f5a7b8c
+          name: CPU Core Discovery
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#SNMPINDEX},1.3.6.1.2.1.25.3.3.1.2]'
+          key: cpu.discovery
+          delay: 5m
+          lifetime: 30d
+          description: Discover CPU cores via hrProcessorLoad OID
+          item_prototypes:
+            - uuid: c1a9e4d72b6f4c8391de5f7a8b9c0d12
+              name: 'CPU Core {#SNMPINDEX}'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.2.1.25.3.3.1.2.{#SNMPINDEX}'
+              key: 'cpu.core[{#SNMPINDEX}]'
+              delay: 1m
+              history: 7d
+              trends: 365d
+              value_type: UNSIGNED 
+              units: '%'
+              description: 'CPU utilization for core index {#SNMPINDEX}'
+              tags:
+                - tag: component
+                  value: cpu
+
+        - uuid: 4d7f2a9c8b314e65a0d46c9e1f2b7a53
+          name: CPU Average
+          type: CALCULATED
+          key: cpu.avg
+          delay: 1m
+          history: 7d
+          trends: 365d
+          value_type: FLOAT
+          units: '%'
+          params: 'avg(last_foreach(/{HOST.HOST}/cpu.core[*]))'
+          description: Average CPU utilization across all discovered cores
+          tags:
+            - tag: component
+              value: cpu
+
+
         - uuid: 2a7f3c9e5b1d408688e2a0c4b6d9f3e1
           name: System Uptime
           type: SNMP_AGENT

@@ -5,11 +5,354 @@ zabbix_export:
       template: Sophos XGS Firewall SNMP
       name: Sophos XGS Firewall SNMP
       description: |
+        Author: Tri Nguyen - Vacif Company Limited
         Template for Sophos XG/SFOS Firewall via SNMP
         Based on SFOS-FIREWALL-MIB (Sophos PLC)
         Supports: Device Info, Stats, HA, Licenses, IPSec VPN LLD, Interface LLD
       groups:
         - name: Templates/Network devices
+
+      # ─── LLD Rules ───────────────────────────────────────────────────
+      discovery_rules:
+      # ── CPU Discovery ──────────────────────────────────
+        - uuid: 8f3d7b2e6c414a0a9e6b1c2d4f5a7b8c
+          name: CPU Core Discovery
+          type: DEPENDENT
+          key: cpu.discovery
+          master_item:
+            key: cpu.walk
+          delay: '0'
+          lifetime: 30d
+
+          preprocessing:
+            - type: SNMP_WALK_TO_JSON
+              parameters:
+                - '{#SNMPINDEX}'                  # params/0: field name
+                - '1.3.6.1.2.1.25.3.3.1.2'       # params/1: OID prefix
+                - '0'                             # params/2: format = Unchanged ✅
+
+          item_prototypes:
+            - uuid: c1a9e4d72b6f4c8391de5f7a8b9c0d12
+              name: 'CPU Core {#SNMPINDEX}'
+              type: DEPENDENT
+              key: 'cpu.core[{#SNMPINDEX}]'
+              master_item:
+                key: cpu.walk
+              delay: '0'
+              history: 7d
+              trends: 365d
+              value_type: UNSIGNED
+              units: '%'
+              preprocessing:
+                - type: SNMP_WALK_VALUE
+                  parameters:
+                    - '1.3.6.1.2.1.25.3.3.1.2.{#SNMPINDEX}'  # ✅
+                    - '0'                                      # format = Unchanged
+                  
+      # ── IPSec VPN Tunnel Discovery ──────────────────────────────────
+        - uuid: 7c0e3f6b9a2d4148a7e0f3b6a9d2c5e8
+          name: IPSec VPN Tunnel Discovery
+          type: SNMP_AGENT
+          snmp_oid: "discovery[{#VPN_NAME},1.3.6.1.4.1.2604.5.1.6.1.1.1.1.2]"
+          key: ipsec.tunnel.discovery
+          delay: 1h
+          lifetime: 30d
+          description: Discovers all IPSec VPN tunnels from sfosIPSecVpnTunnelTable
+          item_prototypes:
+            - uuid: 9e2a5d8f1b4c403689a2d5f8b1c4e7a0
+              name: "VPN [{#VPN_NAME}]: Connection Status"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.9.{#SNMPINDEX}"
+              key: "sophos.ipsec.conn.status[{#VPN_NAME}]"
+              delay: 1m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              description: "Connection status: 0=Inactive, 1=Active, 2=Partially Active"
+              valuemap:
+                name: "Sophos IPSec VPN Connection Status"
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+              trigger_prototypes:
+                - uuid: 4f7b0d3e6c9a415884b7d0e3c6a9f2b5
+                  expression: >-
+                    last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}])=0
+                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}],#2)=1
+                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.activation.status[{#VPN_NAME}])=1
+                  name: "ALERT: VPN connection [{#VPN_NAME}] is DOWN"
+                  priority: DISASTER
+                  description: "IPSec VPN tunnel {#VPN_NAME} was active but is now inactive."
+                  tags:
+                    - tag: VPN Tunnel
+                      value: "{#VPN_NAME}"
+                - uuid: a1c4e7f0b3d6459a8c4e7f0b3d6a9c2e
+                  expression: >-
+                    last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}])=2
+                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.activation.status[{#VPN_NAME}])=1
+                  name: "ALERT: VPN connection [{#VPN_NAME}] is DEGRADED"
+                  priority: HIGH
+                  description: "IPSec VPN tunnel {#VPN_NAME} is only partially active."
+                  tags:
+                    - tag: VPN Tunnel
+                      value: "{#VPN_NAME}"
+
+            - uuid: 6d9f2b5e8c1a4037b6f9b2e5c8a1d4f7
+              name: "VPN [{#VPN_NAME}]: Activation Status"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.10.{#SNMPINDEX}"
+              key: "sophos.ipsec.activation.status[{#VPN_NAME}]"
+              delay: 1m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              description: "Activation status: 0=Inactive, 1=Active"
+              valuemap:
+                name: "Sophos IPSec VPN Activation Status"
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+
+            - uuid: b8e1f4a7d0c3469b8e1f4a7d0c3b6e9f
+              name: "VPN [{#VPN_NAME}]: Active Tunnel Count"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.8.{#SNMPINDEX}"
+              key: "sophos.ipsec.active.tunnel[{#VPN_NAME}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              description: Count of active sub-tunnels for this connection
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+
+            - uuid: 5c8b1e4f7a0d4269b5b8e1f4a7d0c3f6
+              name: "VPN [{#VPN_NAME}]: Connection Type"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.6.{#SNMPINDEX}"
+              key: "sophos.ipsec.conn.type[{#VPN_NAME}]"
+              delay: 1h
+              history: 30d
+              trends: "0"
+              value_type: UNSIGNED
+              description: "Connection type: 1=host-to-host, 2=site-to-site, 3=tunnel-interface"
+              valuemap:
+                name: "Sophos IPSec VPN Connection Type"
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+
+            - uuid: 0a3d6f9c2b5e4147a0d3f6c9b2e5a8d1
+              name: "VPN [{#VPN_NAME}]: Local Gateway Port"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.7.{#SNMPINDEX}"
+              key: "sophos.ipsec.local.gw.port[{#VPN_NAME}]"
+              delay: 1h
+              history: 30d
+              trends: "0"
+              value_type: CHAR
+              description: Port used as local gateway for this IPSec tunnel
+              tags:
+                - tag: component
+                  value: vpn
+                - tag: tunnel
+                  value: "{#VPN_NAME}"
+
+
+
+        # ── Network Interface Discovery (IF-MIB) ────────────────────────
+        - uuid: f5a8c1e4b7d0469faa8c1e4b7d0f3a6c
+          name: Network Interface Discovery
+          type: SNMP_AGENT
+          snmp_oid: "discovery[{#IFINDEX},1.3.6.1.2.1.2.2.1.1,{#IFNAME},1.3.6.1.2.1.31.1.1.1.1,{#IFDESCR},1.3.6.1.2.1.2.2.1.2,{#IFTYPE},1.3.6.1.2.1.2.2.1.3,{#IFADMINSTATUS},1.3.6.1.2.1.2.2.1.7]"
+          key: net.if.discovery
+          delay: 5m
+          lifetime: 30d
+          description: Discovers network interfaces via standard IF-MIB
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: "{#IFNAME}"
+                value: '^(Port[0-9]+|Port[0-9]+\.[0-9]+|PortF[0-9]+|PortMGMT)$'
+                operator: MATCHES_REGEX
+                formulaid: A
+              - macro: "{#IFADMINSTATUS}"
+                value: "^1$"
+                operator: MATCHES_REGEX
+                formulaid: B
+          item_prototypes:
+            - uuid: 2d5f8b1e4a7c4369b2f5b8e1a4c7d0f3
+              name: "Interface [{#IFNAME}]: Operational Status"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}"
+              key: "net.if.status[{#SNMPINDEX}]"
+              delay: 1m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              description: "ifOperStatus: 1=up, 2=down"
+              valuemap:
+                name: "IF-MIB::ifOperStatus"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+              trigger_prototypes:
+                - uuid: 9f2c5e8b1d4a403689c2e5b8d1a4f7c0
+                  expression: "last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}])<>1 and last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}])<>last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}],#2)"
+                  name: "Sophos XG Interface [{#IFNAME}]: Link is DOWN"
+                  priority: HIGH
+                  description: Interface {#IFNAME} operational status changed to down.
+                  manual_close: "YES"
+
+            - uuid: 6a9e2c5f8b1d4037a6e9c2f5b8d1a4f7
+              name: "Interface [{#IFNAME}]: Inbound Traffic (bps)"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}"
+              key: "net.if.in[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: bps
+              description: ifHCInOctets converted to bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ""
+                - type: MULTIPLIER
+                  parameters:
+                    - "8"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+
+            - uuid: 1e4b7d0f3c6a425881b4d7f0a3c6e9b2
+              name: "Interface [{#IFNAME}]: Outbound Traffic (bps)"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}"
+              key: "net.if.out[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: bps
+              description: ifHCOutOctets converted to bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ""
+                - type: MULTIPLIER
+                  parameters:
+                    - "8"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+
+            - uuid: 8c1f4b7e0a3d4259a8f1b4e7a0d3c6f9
+              name: "Interface [{#IFNAME}]: Inbound Errors (eps)"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}"
+              key: "net.if.in.errors[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: eps
+              description: ifInErrors per second
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ""
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+              trigger_prototypes:
+                - uuid: 3d6a9f2c5e8b4047a3a6f9c2e5b8d1a4
+                  expression: "avg(/Sophos XGS Firewall SNMP/net.if.in.errors[{#SNMPINDEX}],5m)>10"
+                  name: "Sophos XG Interface [{#IFNAME}]: High inbound error rate (>10 eps)"
+                  priority: WARNING
+
+            - uuid: f0a3d6c9b2e5414f8a3d6c9b2e5f8a1d
+              name: "Interface [{#IFNAME}]: Outbound Errors (eps)"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}"
+              key: "net.if.out.errors[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: eps
+              description: ifOutErrors per second
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ""
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+              trigger_prototypes:
+                - uuid: 5b8e1c4f7a0d4269b5e8c1f4a7d0b3e6
+                  expression: "avg(/Sophos XGS Firewall SNMP/net.if.out.errors[{#SNMPINDEX}],5m)>10"
+                  name: "Sophos XG Interface [{#IFNAME}]: High outbound error rate (>10 eps)"
+                  priority: WARNING
+
+            - uuid: a2d5f8b1e4c7436a9d5f8b1e4c7a0d3f
+              name: "Interface [{#IFNAME}]: Speed"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}"
+              key: "net.if.speed[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: 365d
+              value_type: UNSIGNED
+              units: bps
+              description: ifHighSpeed in Mbps multiplied to bps
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - "1000000"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
+
+            - uuid: 7f0c3b6e9a2d414887c0b3e6a9d2f5c8
+              name: "Interface [{#IFNAME}]: Admin Status"
+              type: SNMP_AGENT
+              snmp_oid: "1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}"
+              key: "net.if.admin.status[{#SNMPINDEX}]"
+              delay: 5m
+              history: 30d
+              trends: "0"
+              value_type: UNSIGNED
+              description: "ifAdminStatus: 1=up, 2=down, 3=testing"
+              valuemap:
+                name: "IF-MIB::ifAdminStatus"
+              tags:
+                - tag: component
+                  value: interface
+                - tag: interface
+                  value: "{#IFNAME}"
 
       items:
         # ─── Device Info ───────────────────────────────────────────────
@@ -56,30 +399,18 @@ zabbix_export:
               value: device-info
 
         # ─── Device Stats ──────────────────────────────────────────────
-        - uuid: 8f3d7b2e6c414a0a9e6b1c2d4f5a7b8c
-          name: CPU Core Discovery
-          type: SNMP_AGENT
-          snmp_oid: 'discovery[{#SNMPINDEX},1.3.6.1.2.1.25.3.3.1.2]'
-          key: cpu.discovery
-          delay: 5m
-          lifetime: 30d
-          description: Discover CPU cores via hrProcessorLoad OID
-          item_prototypes:
-            - uuid: c1a9e4d72b6f4c8391de5f7a8b9c0d12
-              name: 'CPU Core {#SNMPINDEX}'
-              type: SNMP_AGENT
-              snmp_oid: '1.3.6.1.2.1.25.3.3.1.2.{#SNMPINDEX}'
-              key: 'cpu.core[{#SNMPINDEX}]'
-              delay: 1m
-              history: 7d
-              trends: 365d
-              value_type: UNSIGNED 
-              units: '%'
-              description: 'CPU utilization for core index {#SNMPINDEX}'
-              tags:
-                - tag: component
-                  value: cpu
 
+        - uuid: 4d7f2a9c8b314e65a0d46c9e1f2b7aa3
+          name: CPU SNMP Walk
+          type: SNMP_AGENT
+          snmp_oid: 'walk[1.3.6.1.2.1.25.3.3.1.2]'
+          key: cpu.walk
+          delay: 1m
+          history: 1h
+          trends: '0'
+          value_type: TEXT
+
+        # ===== Calculated Item tính trung bình =====
         - uuid: 4d7f2a9c8b314e65a0d46c9e1f2b7a53
           name: CPU Average
           type: CALCULATED
@@ -90,10 +421,6 @@ zabbix_export:
           value_type: FLOAT
           units: '%'
           params: 'avg(last_foreach(/{HOST.HOST}/cpu.core[*]))'
-          description: Average CPU utilization across all discovered cores
-          tags:
-            - tag: component
-              value: cpu
 
 
         - uuid: 2a7f3c9e5b1d408688e2a0c4b6d9f3e1
@@ -569,315 +896,6 @@ zabbix_export:
               expression: "last(/Sophos XGS Firewall SNMP/sfosCentralOrchestrationLicRegStatus)=2"
               name: "Sophos XGS: Central Orchestration is NOT subscribed"
               priority: WARNING
-
-      # ─── LLD Rules ───────────────────────────────────────────────────
-      discovery_rules:
-
-        # ── IPSec VPN Tunnel Discovery ──────────────────────────────────
-        - uuid: 7c0e3f6b9a2d4148a7e0f3b6a9d2c5e8
-          name: IPSec VPN Tunnel Discovery
-          type: SNMP_AGENT
-          snmp_oid: "discovery[{#VPN_NAME},1.3.6.1.4.1.2604.5.1.6.1.1.1.1.2]"
-          key: ipsec.tunnel.discovery
-          delay: 1h
-          lifetime: 30d
-          description: Discovers all IPSec VPN tunnels from sfosIPSecVpnTunnelTable
-          item_prototypes:
-            - uuid: 9e2a5d8f1b4c403689a2d5f8b1c4e7a0
-              name: "VPN [{#VPN_NAME}]: Connection Status"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.9.{#SNMPINDEX}"
-              key: "sophos.ipsec.conn.status[{#VPN_NAME}]"
-              delay: 1m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              description: "Connection status: 0=Inactive, 1=Active, 2=Partially Active"
-              valuemap:
-                name: "Sophos IPSec VPN Connection Status"
-              tags:
-                - tag: component
-                  value: vpn
-                - tag: tunnel
-                  value: "{#VPN_NAME}"
-              trigger_prototypes:
-                - uuid: 4f7b0d3e6c9a415884b7d0e3c6a9f2b5
-                  expression: >-
-                    last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}])=0
-                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}],#2)=1
-                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.activation.status[{#VPN_NAME}])=1
-                  name: "ALERT: VPN connection [{#VPN_NAME}] is DOWN"
-                  priority: DISASTER
-                  description: "IPSec VPN tunnel {#VPN_NAME} was active but is now inactive."
-                  tags:
-                    - tag: VPN Tunnel
-                      value: "{#VPN_NAME}"
-                - uuid: a1c4e7f0b3d6459a8c4e7f0b3d6a9c2e
-                  expression: >-
-                    last(/Sophos XGS Firewall SNMP/sophos.ipsec.conn.status[{#VPN_NAME}])=2
-                    and last(/Sophos XGS Firewall SNMP/sophos.ipsec.activation.status[{#VPN_NAME}])=1
-                  name: "ALERT: VPN connection [{#VPN_NAME}] is DEGRADED"
-                  priority: HIGH
-                  description: "IPSec VPN tunnel {#VPN_NAME} is only partially active."
-                  tags:
-                    - tag: VPN Tunnel
-                      value: "{#VPN_NAME}"
-
-            - uuid: 6d9f2b5e8c1a4037b6f9b2e5c8a1d4f7
-              name: "VPN [{#VPN_NAME}]: Activation Status"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.10.{#SNMPINDEX}"
-              key: "sophos.ipsec.activation.status[{#VPN_NAME}]"
-              delay: 1m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              description: "Activation status: 0=Inactive, 1=Active"
-              valuemap:
-                name: "Sophos IPSec VPN Activation Status"
-              tags:
-                - tag: component
-                  value: vpn
-                - tag: tunnel
-                  value: "{#VPN_NAME}"
-
-            - uuid: b8e1f4a7d0c3469b8e1f4a7d0c3b6e9f
-              name: "VPN [{#VPN_NAME}]: Active Tunnel Count"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.8.{#SNMPINDEX}"
-              key: "sophos.ipsec.active.tunnel[{#VPN_NAME}]"
-              delay: 5m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              description: Count of active sub-tunnels for this connection
-              tags:
-                - tag: component
-                  value: vpn
-                - tag: tunnel
-                  value: "{#VPN_NAME}"
-
-            - uuid: 5c8b1e4f7a0d4269b5b8e1f4a7d0c3f6
-              name: "VPN [{#VPN_NAME}]: Connection Type"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.6.{#SNMPINDEX}"
-              key: "sophos.ipsec.conn.type[{#VPN_NAME}]"
-              delay: 1h
-              history: 30d
-              trends: "0"
-              value_type: UNSIGNED
-              description: "Connection type: 1=host-to-host, 2=site-to-site, 3=tunnel-interface"
-              valuemap:
-                name: "Sophos IPSec VPN Connection Type"
-              tags:
-                - tag: component
-                  value: vpn
-                - tag: tunnel
-                  value: "{#VPN_NAME}"
-
-            - uuid: 0a3d6f9c2b5e4147a0d3f6c9b2e5a8d1
-              name: "VPN [{#VPN_NAME}]: Local Gateway Port"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.4.1.2604.5.1.6.1.1.1.1.7.{#SNMPINDEX}"
-              key: "sophos.ipsec.local.gw.port[{#VPN_NAME}]"
-              delay: 1h
-              history: 30d
-              trends: "0"
-              value_type: CHAR
-              description: Port used as local gateway for this IPSec tunnel
-              tags:
-                - tag: component
-                  value: vpn
-                - tag: tunnel
-                  value: "{#VPN_NAME}"
-
-
-
-        # ── Network Interface Discovery (IF-MIB) ────────────────────────
-        - uuid: f5a8c1e4b7d0469faa8c1e4b7d0f3a6c
-          name: Network Interface Discovery
-          type: SNMP_AGENT
-          snmp_oid: "discovery[{#IFINDEX},1.3.6.1.2.1.2.2.1.1,{#IFNAME},1.3.6.1.2.1.31.1.1.1.1,{#IFDESCR},1.3.6.1.2.1.2.2.1.2,{#IFTYPE},1.3.6.1.2.1.2.2.1.3,{#IFADMINSTATUS},1.3.6.1.2.1.2.2.1.7]"
-          key: net.if.discovery
-          delay: 5m
-          lifetime: 30d
-          description: Discovers network interfaces via standard IF-MIB
-          filter:
-            evaltype: AND
-            conditions:
-              - macro: "{#IFNAME}"
-                value: '^(Port[0-9]+|Port[0-9]+\.[0-9]+|PortF[0-9]+|PortMGMT)$'
-                operator: MATCHES_REGEX
-                formulaid: A
-              - macro: "{#IFADMINSTATUS}"
-                value: "^1$"
-                operator: MATCHES_REGEX
-                formulaid: B
-          item_prototypes:
-            - uuid: 2d5f8b1e4a7c4369b2f5b8e1a4c7d0f3
-              name: "Interface [{#IFNAME}]: Operational Status"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}"
-              key: "net.if.status[{#SNMPINDEX}]"
-              delay: 1m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              description: "ifOperStatus: 1=up, 2=down"
-              valuemap:
-                name: "IF-MIB::ifOperStatus"
-              tags:
-                - tag: component
-                  value: interface
-                - tag: interface
-                  value: "{#IFNAME}"
-              trigger_prototypes:
-                - uuid: 9f2c5e8b1d4a403689c2e5b8d1a4f7c0
-                  expression: "last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}])<>1 and last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}])<>last(/Sophos XGS Firewall SNMP/net.if.status[{#SNMPINDEX}],#2)"
-                  name: "Sophos XG Interface [{#IFNAME}]: Link is DOWN"
-                  priority: HIGH
-                  description: Interface {#IFNAME} operational status changed to down.
-                  manual_close: "YES"
-
-            - uuid: 6a9e2c5f8b1d4037a6e9c2f5b8d1a4f7
-              name: "Interface [{#IFNAME}]: Inbound Traffic (bps)"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}"
-              key: "net.if.in[{#SNMPINDEX}]"
-              delay: 5m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              units: bps
-              description: ifHCInOctets converted to bps
-              preprocessing:
-                - type: CHANGE_PER_SECOND
-                  parameters:
-                    - ""
-                - type: MULTIPLIER
-                  parameters:
-                    - "8"
-              tags:
-                - tag: component
-                  value: interface
-                - tag: interface
-                  value: "{#IFNAME}"
-
-            - uuid: 1e4b7d0f3c6a425881b4d7f0a3c6e9b2
-              name: "Interface [{#IFNAME}]: Outbound Traffic (bps)"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}"
-              key: "net.if.out[{#SNMPINDEX}]"
-              delay: 5m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              units: bps
-              description: ifHCOutOctets converted to bps
-              preprocessing:
-                - type: CHANGE_PER_SECOND
-                  parameters:
-                    - ""
-                - type: MULTIPLIER
-                  parameters:
-                    - "8"
-              tags:
-                - tag: component
-                  value: interface
-                - tag: interface
-                  value: "{#IFNAME}"
-
-            - uuid: 8c1f4b7e0a3d4259a8f1b4e7a0d3c6f9
-              name: "Interface [{#IFNAME}]: Inbound Errors (eps)"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}"
-              key: "net.if.in.errors[{#SNMPINDEX}]"
-              delay: 5m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              units: eps
-              description: ifInErrors per second
-              preprocessing:
-                - type: CHANGE_PER_SECOND
-                  parameters:
-                    - ""
-              tags:
-                - tag: component
-                  value: interface
-                - tag: interface
-                  value: "{#IFNAME}"
-              trigger_prototypes:
-                - uuid: 3d6a9f2c5e8b4047a3a6f9c2e5b8d1a4
-                  expression: "avg(/Sophos XGS Firewall SNMP/net.if.in.errors[{#SNMPINDEX}],5m)>10"
-                  name: "Sophos XG Interface [{#IFNAME}]: High inbound error rate (>10 eps)"
-                  priority: WARNING
-
-            - uuid: f0a3d6c9b2e5414f8a3d6c9b2e5f8a1d
-              name: "Interface [{#IFNAME}]: Outbound Errors (eps)"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}"
-              key: "net.if.out.errors[{#SNMPINDEX}]"
-              delay: 5m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              units: eps
-              description: ifOutErrors per second
-              preprocessing:
-                - type: CHANGE_PER_SECOND
-                  parameters:
-                    - ""
-              tags:
-                - tag: component
-                  value: interface
-                - tag: interface
-                  value: "{#IFNAME}"
-              trigger_prototypes:
-                - uuid: 5b8e1c4f7a0d4269b5e8c1f4a7d0b3e6
-                  expression: "avg(/Sophos XGS Firewall SNMP/net.if.out.errors[{#SNMPINDEX}],5m)>10"
-                  name: "Sophos XG Interface [{#IFNAME}]: High outbound error rate (>10 eps)"
-                  priority: WARNING
-
-            - uuid: a2d5f8b1e4c7436a9d5f8b1e4c7a0d3f
-              name: "Interface [{#IFNAME}]: Speed"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}"
-              key: "net.if.speed[{#SNMPINDEX}]"
-              delay: 5m
-              history: 30d
-              trends: 365d
-              value_type: UNSIGNED
-              units: bps
-              description: ifHighSpeed in Mbps multiplied to bps
-              preprocessing:
-                - type: MULTIPLIER
-                  parameters:
-                    - "1000000"
-              tags:
-                - tag: component
-                  value: interface
-                - tag: interface
-                  value: "{#IFNAME}"
-
-            - uuid: 7f0c3b6e9a2d414887c0b3e6a9d2f5c8
-              name: "Interface [{#IFNAME}]: Admin Status"
-              type: SNMP_AGENT
-              snmp_oid: "1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}"
-              key: "net.if.admin.status[{#SNMPINDEX}]"
-              delay: 5m
-              history: 30d
-              trends: "0"
-              value_type: UNSIGNED
-              description: "ifAdminStatus: 1=up, 2=down, 3=testing"
-              valuemap:
-                name: "IF-MIB::ifAdminStatus"
-              tags:
-                - tag: component
-                  value: interface
-                - tag: interface
-                  value: "{#IFNAME}"
-
 
       # ─── Value Maps ───────────────────────────────────────────────────
       valuemaps:

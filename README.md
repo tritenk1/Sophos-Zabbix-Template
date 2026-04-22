@@ -10,7 +10,7 @@ Template này sử dụng SNMP để thu thập dữ liệu và cung cấp các 
 
 - Chỉ số thiết bị (System Health)
 
-- Giám sát Memory (RAM) và Storage (Disk usage)
+- Giám sát CPU, Memory (RAM) và Storage (Disk usage)
 
 - Thời gian hoạt động (Uptime)
 
